@@ -93,6 +93,35 @@ Se entrega un **Python *embeddable* portable** dentro del proyecto:
 
 > *Gotcha:* en el *embeddable*, descomenta `import site` en `pythonXXX._pth`.
 
+## Curiosidad observada: PyPb y el export XLSX nativo compiten por .NET
+
+Al probar los dos exports nos topamos con un comportamiento llamativo:
+
+- **Python → nativo:** funciona. Y a partir de ahí, en cualquier orden.
+- **Nativo → Python:** el botón de Python falla con
+  `Could not create instance of .NET Assembly: Load bin.pypb.appeon\…dll failed`.
+
+La causa: **PowerBuilder carga el runtime .NET una sola vez por proceso.** El export
+XLSX nativo (`SaveDisplayedDataAs`) y PyPb usan .NET, y **manda quien lo inicialice
+primero**. Si el nativo va primero, PyPb ya no puede cargar su *assembly*.
+
+Nuestro **primer intento** fue restaurar el *directorio de trabajo* tras el export
+(PyPb carga su DLL por ruta relativa `bin.pypb.appeon\…`) — pero **no funcionó**: no
+era el directorio, era el **orden de inicialización**.
+
+La **solución**: **pre-cargar PyPb al arrancar la app** (en el `open` del objeto
+aplicación, antes de abrir la ventana), para que su .NET se inicialice el primero:
+
+```powerscript
+n_cst_pyton lnv_pyinit
+lnv_pyinit = CREATE n_cst_pyton
+lnv_pyinit.of_init(gs_appdir + "\python.runtime\python313.dll")
+DESTROY lnv_pyinit
+```
+
+El contexto de Python es global y persiste tras el `DESTROY`, así que después los
+botones funcionan en cualquier orden.
+
 ## Notas y *gotchas* (PyPb es beta)
 
 - **`of_executestatement` usa `eval()` de Python → solo EXPRESIONES.** Una asignación
@@ -100,8 +129,8 @@ Se entrega un **Python *embeddable* portable** dentro del proyecto:
 - **`of_set(prop, string)` pasa un `System.String` de .NET**, no un `str` de Python →
   rompe el código que valida tipos con `re`/`isinstance(str)` (p. ej. openpyxl).
 - **PyPb mantiene un único contexto de Python por proceso** y lo reutiliza.
-- **No existe `dw.ExportString(JSON!)`** en esta versión; el ejemplo pasa rutas y
-  Python lee el fichero.
+- Para pasar los datos del grid a Python se usa **`dw_1.ExportJson()`** (en esta
+  versión `ExportString(JSON!)` no existe), así el Excel sale **fiel al DataWindow**.
 
 > PyPb es una característica **beta** de Appeon. Este repositorio es un ejemplo de
 > aprendizaje, no código de producción.
