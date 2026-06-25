@@ -1,53 +1,73 @@
-# PyPbExample — PowerBuilder + PyPb → Python → Excel
+# PyPbExample — Integrar Python en PowerBuilder con PyPb
 
-Ejemplo autocontenido de cómo **llamar a Python desde PowerBuilder 2025 R2**
-usando **[PyPb](https://github.com/Appeon/PyPb)** (el wrapper *beta* de Appeon
-sobre Python.NET), con un **runtime de Python embebido y portable** para que el
-usuario final **no tenga que instalar nada**.
+Ejemplo de cómo **usar Python desde PowerBuilder 2025 R2** con
+**[PyPb](https://github.com/Appeon/PyPb)** (el *bridge* *beta* de Appeon sobre
+Python.NET), con un **runtime de Python embebido y portable** para que el usuario
+final **no tenga que instalar nada**.
 
-El ejemplo carga un JSON (300 facturas) en un **DataWindow** y lo exporta a Excel
-de dos formas, para responder a una pregunta: **¿generar el Excel con Python es
-una mejora frente al export nativo de PowerBuilder?**
+El objetivo del proyecto es tener una clase reutilizable, **`n_cst_pyton`**, que
+permita **integrar cualquier cosa de Python en PowerBuilder con facilidad**:
+importar módulos, llamar funciones, instanciar clases y convertir resultados, sin
+escribir nada de C# ni montar APIs web.
 
-## Qué demuestra
+> Como caso práctico hemos elegido **Excel**: PowerBuilder 2025 incorpora la nueva
+> función nativa `SaveDisplayedDataAs(…, XLSX!)`, y de paso mostramos cómo, con
+> Python (openpyxl), se puede ir un paso más allá y generar un `.xlsx` con estilo
+> (colores, formato moneda, totales, autofiltro…). Pero el Excel es solo la
+> excusa: lo importante es **lo fácil que resulta llamar a Python una vez tienes
+> `n_cst_pyton`**.
 
-| | **Nativo (PB)** `SaveDisplayedDataAs(…, XLSX!)` | **Python** (openpyxl) |
-|---|---|---|
-| `.xlsx` real | ✅ | ✅ |
-| Cabeceras mostradas, formato moneda, totales | ✅ | ✅ |
-| Respeta columnas ocultas / reordenadas | ✅ | ✅ |
-| Colores / negrita / fuentes en celda | ❌ | ✅ |
-| Autofiltro / cabecera inmovilizada | ❌ | ✅ |
-| Líneas de código | 1 | un módulo `.py` + una fachada PB |
+## La pieza central: `n_cst_pyton`
 
-**Conclusión:** el nativo `SaveDisplayedDataAs(XLSX!)` ya te da una hoja Excel
-**correcta** en una sola línea. Python compensa cuando necesitas **estilo visual**
-(colores, totales destacados, filas alternas, filtros) — es decir, un informe
-**presentable**.
+Una fachada fina en PowerScript sobre PyPb, con manejo de errores al estilo ERP
+(`0/-1` + `of_lasterror()`) y sin excepciones hacia fuera:
 
-## Cómo funciona
+```powerscript
+n_cst_pyton lnv_py
+string ls_ver
 
-- **`n_cst_pyton`** — fachada fina en PowerScript sobre PyPb (init / import / run /
-  invoke), con manejo de errores al estilo ERP (`0/-1` + `of_lasterror()`) y sin
-  excepciones hacia fuera.
-- **`n_cst_pyton_excel`** — objeto de negocio de ejemplo que usa openpyxl a través
-  de la fachada.
-- **`python.runtime/`** — un **Python 3.13 *embeddable*** con **openpyxl incluido**
-  (`pip install … -t python.runtime`). Viaja junto a la aplicación; nada que instalar.
-- **`bin.pypb.appeon/`** — los *assemblies* .NET de PyPb (se despliegan junto al EXE).
-- **`export_facturas.py`** — exportador estilizado y *data-driven*: PB le pasa las
-  **columnas visibles** del DataWindow para que el Excel refleje lo que se ve en
-  pantalla.
+lnv_py = CREATE n_cst_pyton
+lnv_py.of_init("…\python.runtime\python313.dll")   // arranca el runtime
+lnv_py.of_invoke("platform", "python_version", ls_ver)   // import + llamada
+// ls_ver -> "3.13.1"
+DESTROY lnv_py
+```
 
-## Funciones del ejemplo (ventana `w_main`)
+| Método | Para qué |
+|---|---|
+| `of_init(dll)` | Arranca (o reutiliza) el runtime de Python |
+| `of_import(modulo, ref mod)` | Importa un módulo (con caché) |
+| `of_invoke(modulo, func, ref res)` | Atajo: importa + llama función → string |
+| `of_run(sentencia, ref res)` | Ejecuta una expresión Python suelta |
+| `of_exec_req(sentencia, req, ref res)` | Ejecuta Python con variables locales |
+| `of_lasterror()` | Último error capturado |
+
+Con esto, integrar **pandas, numpy, openpyxl, OpenCV…** es cuestión de
+`of_import` + `of_invoke`.
+
+## Qué incluye el ejemplo (ventana `w_main`)
 
 | Botón | Qué hace |
 |---|---|
-| **Probar Python** | Arranca el runtime e imprime la versión de Python (`platform.python_version()`). |
+| **Probar Python** | Arranca el runtime e imprime la versión (`platform.python_version()`). |
 | **Crear Excel (openpyxl)** | Crea un `.xlsx` básico con openpyxl vía `n_cst_pyton_excel`. |
-| **Recargar facturas (JSON)** | Carga `data2026.json` en el DataWindow (`JSONParser`). |
-| **Excel nativo (PB XLSX)** | `dw_1.SaveDisplayedDataAs(…, XLSX!)`. |
-| **Excel Python (openpyxl)** | Exporta el grid a un `.xlsx` con estilos (cabecera color, filas zebra, moneda €, totales, autofiltro, cabecera fija). |
+| **Recargar facturas (JSON)** | Carga `data2026.json` (300 facturas) en un DataWindow. |
+| **Excel nativo (PB XLSX)** | La nueva función de PB 2025: `dw_1.SaveDisplayedDataAs(…, XLSX!)`. |
+| **Excel Python (openpyxl)** | Exporta el grid a un `.xlsx` con estilo: cabecera color, filas zebra, moneda €, totales, autofiltro y cabecera fija. |
+
+`n_cst_pyton_excel` es un objeto de negocio de ejemplo construido **encima** de
+`n_cst_pyton`, para enseñar el patrón de envolver una librería Python en una clase
+PB de uso cómodo.
+
+## Cómo funciona
+
+- **`n_cst_pyton`** — la fachada reutilizable (lo importante del repo).
+- **`n_cst_pyton_excel`** — ejemplo de objeto de negocio sobre openpyxl.
+- **`python.runtime/`** — Python 3.13 *embeddable* con **openpyxl incluido**
+  (`pip install … -t python.runtime`). Viaja junto a la app; nada que instalar.
+- **`bin.pypb.appeon/`** — los *assemblies* .NET de PyPb (se despliegan con el EXE).
+- **`export_facturas.py`** — exportador estilizado *data-driven*: PB le pasa las
+  columnas **visibles** del DataWindow para que el Excel refleje lo que se ve.
 
 ## Requisitos
 
@@ -59,8 +79,7 @@ una mejora frente al export nativo de PowerBuilder?**
 
 1. Abre el *workspace* en el IDE de PowerBuilder.
 2. Asegúrate de que **`pypblib.pbl`** está en la *library list* del *target*.
-3. Compila y ejecuta. El grid se llena al abrir; usa los dos botones de export y
-   compara `facturas_nativo.xlsx` con `facturas_python.xlsx`.
+3. Compila y ejecuta.
 
 ## Despliegue (sin instalar Python en el cliente)
 
@@ -77,14 +96,12 @@ Se entrega un **Python *embeddable* portable** dentro del proyecto:
 ## Notas y *gotchas* (PyPb es beta)
 
 - **`of_executestatement` usa `eval()` de Python → solo EXPRESIONES.** Una asignación
-  (`ws.title = x`) lanza `SyntaxError`; usa `setattr(...)` o métodos.
+  (`ws.title = x`) lanza `SyntaxError`; usa `setattr(...)` o métodos (`of_exec_req`).
 - **`of_set(prop, string)` pasa un `System.String` de .NET**, no un `str` de Python →
-  rompe el código que valida con `re`/`isinstance(str)` (p. ej. openpyxl). Pasa el
-  valor como argumento con nombre de un *invocation request*.
-- **PyPb mantiene un único contexto de Python por proceso** y lo reutiliza: no mezcles
-  runtimes distintos.
-- **No existe `dw.ExportString(JSON!)`** en esta versión; el ejemplo pasa rutas y Python
-  lee el fichero.
+  rompe el código que valida tipos con `re`/`isinstance(str)` (p. ej. openpyxl).
+- **PyPb mantiene un único contexto de Python por proceso** y lo reutiliza.
+- **No existe `dw.ExportString(JSON!)`** en esta versión; el ejemplo pasa rutas y
+  Python lee el fichero.
 
 > PyPb es una característica **beta** de Appeon. Este repositorio es un ejemplo de
 > aprendizaje, no código de producción.
