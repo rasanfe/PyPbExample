@@ -1,0 +1,9 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<Project>
+  <Type Name="pb"/>
+  <Application Name="pypbexample"/>
+  <Libraries AppEntry="pypbexample.pbl">
+    <Library Path="pypbexample.pbl"/>
+    <Library Path="pypblib.pbl"/>
+  </Libraries>
+</Project>

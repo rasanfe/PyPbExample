@@ -1,0 +1,23 @@
+# === PyPbExample .gitignore ===
+# Se sube TODO (incl. python.runtime/, bin.pypb.appeon/, pypblib.pbl, data2026.json).
+# Solo se ignora lo REGENERABLE: cache del IDE, compilados y salidas del ejemplo.
+
+# Cache / build del IDE de PowerBuilder
+.pb/
+build/
+*.pbd
+*.pdb
+pypbexample.usr.opt
+
+# Lock temporal de PyPb (se crea en ejecucion)
+.pypbcontextlock
+
+# Salidas que genera el propio ejemplo al ejecutar
+salida_pypb.xlsx
+facturas_nativo.xlsx
+facturas_python.xlsx
+facturas_*.csv
+
+# Bytecode de Python (se regenera; no ensucia el runtime embebido)
+**/__pycache__/
+**/*.pyc
