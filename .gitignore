@@ -7,15 +7,13 @@
 build/
 *.pbd
 *.pdb
-pypbexample.usr.opt
+*.opt
 
 # Lock temporal de PyPb (se crea en ejecucion)
 .pypbcontextlock
 
 # Salidas que genera el propio ejemplo al ejecutar
-salida_pypb.xlsx
-facturas_nativo.xlsx
-facturas_python.xlsx
+*.xlsx
 facturas_*.csv
 
 # Bytecode de Python (se regenera; no ensucia el runtime embebido)
