@@ -1,0 +1,24 @@
+﻿//objectcomments Abre un archivo con el programa predeterminado de windows y espera para borrarlo
+global type gf_abrir_archivo from function_object
+end type
+
+forward prototypes
+global function boolean gf_abrir_archivo (string as_ruta, window aw_window)
+end prototypes
+
+global function boolean gf_abrir_archivo (string as_ruta, window aw_window);Long ll_handle, ll_return
+Boolean lb_return=FALSE
+
+ll_handle=handle(aw_window) 
+
+ll_return=ShellExecute(ll_handle,"open", as_ruta,"","", 1) 
+
+if ll_return=1 then lb_return=TRUE
+
+RETURN lb_return
+		
+
+
+
+end function
+

@@ -69,6 +69,7 @@ public subroutine wf_probar_excel ()
 public subroutine wf_cargar_facturas ()
 public subroutine wf_excel_nativo ()
 public subroutine wf_excel_python ()
+public function boolean wf_preparar_fichero (string as_ruta)
 end prototypes
 
 public subroutine wf_version ();String ls_version, ls_platform
@@ -100,7 +101,7 @@ string ls_ver, ls_calc
 lnv_py = CREATE n_cst_pyton
 
 // 1) Arrancar el runtime de Python EMBEBIDO y portable (incluye openpyxl)
-If lnv_py.of_init("C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\python.runtime\python313.dll") <> 0 Then
+If lnv_py.of_init(gs_appdir+"\python.runtime\python313.dll") <> 0 Then
 	st_pyversion.text = "ERROR al iniciar Python"
 	MessageBox("PyPb", "No arranca Python:~r~n" + lnv_py.of_lasterror())
 	DESTROY lnv_py
@@ -131,8 +132,10 @@ string ls_dll, ls_ruta
 
 // Runtime portable que vive DENTRO del proyecto (modelo de despliegue al cliente).
 // En produccion: ruta relativa al EXE o configurable, en vez de absoluta.
-ls_dll  = "C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\python.runtime\python313.dll"
-ls_ruta = "C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\salida_pypb.xlsx"
+ls_dll  = gs_appdir+"\python.runtime\python313.dll"
+ls_ruta = gs_appdir+"\salida_pypb.xlsx"
+
+If Not wf_preparar_fichero(ls_ruta) Then Return
 
 lnv_xls = CREATE n_cst_pyton_excel
 
@@ -163,7 +166,9 @@ If lnv_xls.of_guardar(ls_ruta) <> 0 Then
 	Return
 End If
 
-MessageBox("Excel/PyPb OK", "Fichero creado:~r~n" + ls_ruta + "~r~n~r~nDiagnostico of_set: " + lnv_xls.of_lastdiag())
+// Mensaje original (comentado): abrimos el fichero generado en su lugar
+// MessageBox("Excel/PyPb OK", "Fichero creado:~r~n" + ls_ruta + "~r~n~r~nDiagnostico of_set: " + lnv_xls.of_lastdiag())
+gf_abrir_archivo(ls_ruta, This)
 DESTROY lnv_xls
 end subroutine
 
@@ -172,7 +177,7 @@ JSONParser ljp
 string ls_err, ls_file
 long ll_root, ll_item, ll_count, ll_row, i
 
-ls_file = "C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\data2026.json"
+ls_file = gs_appdir+"\data2026.json"
 
 ljp = CREATE JSONParser
 ls_err = ljp.LoadFile(ls_file)
@@ -223,15 +228,27 @@ If dw_1.RowCount() < 1 Then
 	Return
 End If
 
-ls_path = "C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\facturas_nativo.xlsx"
+ls_path = gs_appdir+"\facturas_nativo.xlsx"
+
+If Not wf_preparar_fichero(ls_path) Then Return
 
 // SaveDisplayedDataAs: .xlsx REAL con los VALORES MOSTRADOS (cabeceras tal como
 // se ven, formato de numero/moneda mostrado, computed/totales) y respeta las
 // columnas ocultas. PERO no guarda atributos de fuente: SIN colores, negrita ni fills.
 li_rc = dw_1.SaveDisplayedDataAs(ls_path, XLSX!)
 
+// 1er intento que NO funciono (se deja por didactica; es inofensivo):
+// pensabamos que SaveDisplayedDataAs(XLSX!) rompia a PyPb al cambiar el directorio
+// de trabajo (PyPb carga su assembly por ruta relativa bin.pypb.appeon\). Pero
+// restaurar el cwd NO arreglo el orden nativo->Python: la causa real es el ORDEN de
+// inicializacion de .NET. La solucion definitiva esta en el open del objeto
+// aplicacion (pre-cargar PyPb al arranque).
+ChangeDirectory(gs_appdir)
+
 If li_rc = 1 Then
-	MessageBox("Excel nativo (PB XLSX)", "Guardado:~r~n" + ls_path + "~r~n~r~n.xlsx real con datos y cabeceras mostrados, pero SIN colores ni negrita (SaveDisplayedDataAs no guarda fuentes).")
+	// Mensaje original (comentado): abrimos el fichero generado en su lugar
+	// MessageBox("Excel nativo (PB XLSX)", "Guardado:~r~n" + ls_path + "~r~n~r~n.xlsx real con datos y cabeceras mostrados, pero SIN colores ni negrita (SaveDisplayedDataAs no guarda fuentes).")
+	gf_abrir_archivo(ls_path, This)
 Else
 	MessageBox("Excel nativo (PB XLSX)", "Error en SaveDisplayedDataAs: " + String(li_rc))
 End If
@@ -242,7 +259,7 @@ n_cst_pyton lnv_py
 n_cst_pypbmodule lnv_mod
 n_cst_invocationrequest lnv_req
 n_cst_pypbobject lnv_res
-string ls_dll, ls_out, ls_in, ls_cols, ls_name
+string ls_dll, ls_out, ls_json, ls_cols, ls_name
 long ll_filas, ll_ncols, j
 
 If dw_1.RowCount() < 1 Then
@@ -250,9 +267,14 @@ If dw_1.RowCount() < 1 Then
 	Return
 End If
 
-ls_dll = "C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\python.runtime\python313.dll"
-ls_out = "C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\facturas_python.xlsx"
-ls_in  = "C:\proyecto pw2025\Blog\PowerBuilder\PyPbExample\data2026.json"
+ls_dll = gs_appdir+"\python.runtime\python313.dll"
+ls_out = gs_appdir+"\facturas_python.xlsx"
+
+If Not wf_preparar_fichero(ls_out) Then Return
+
+// Datos VIVOS del DataWindow serializados a JSON (fiel a lo que hay en el grid).
+// En esta version no existe ExportString(JSON!); se usa ExportJson().
+ls_json = dw_1.ExportJson()
 
 // Columnas VISIBLES del DataWindow (en su orden) -> el Excel respeta lo que
 // se ve en el grid (ocultar / reordenar columnas).
@@ -280,8 +302,8 @@ If lnv_py.of_import("export_facturas", lnv_mod) <> 0 Then
 	Return
 End If
 
-lnv_req = lnv_mod.of_createinvocationrequest("export_file")
-lnv_req.of_addargument(ls_in)
+lnv_req = lnv_mod.of_createinvocationrequest("export")
+lnv_req.of_addargument(ls_json)
 lnv_req.of_addargument(ls_out)
 lnv_req.of_addargument(ls_cols)
 
@@ -294,9 +316,26 @@ End If
 ll_filas = lnv_res.of_toint()
 DESTROY lnv_py
 
-MessageBox("Excel Python (openpyxl) OK", String(ll_filas) + " filas ->~r~n" + ls_out + &
-	"~r~n~r~nCabecera color, filas zebra, moneda EUR, fila de totales, autofiltro y cabecera fija.")
+// Mensaje original (comentado): abrimos el fichero generado en su lugar
+/* MessageBox("Excel Python (openpyxl) OK", String(ll_filas) + " filas ->~r~n" + ls_out + &
+	"~r~n~r~nCabecera color, filas zebra, moneda EUR, fila de totales, autofiltro y cabecera fija.") */
+gf_abrir_archivo(ls_out, This)
 end subroutine
+
+public function boolean wf_preparar_fichero (string as_ruta);//=== wf_preparar_fichero: borra el fichero previo si existe ===
+// Devuelve TRUE si el fichero esta listo para escribir; FALSE si estaba
+// bloqueado (p.ej. abierto en Excel) -> en ese caso ya avisa con MessageBox.
+
+If FileExists(as_ruta) Then
+	If Not FileDelete(as_ruta) Then
+		MessageBox("Fichero en uso", "No se pudo borrar el fichero anterior." + &
+			"~r~n¿Lo tienes abierto?~r~n~r~n" + as_ruta)
+		Return False
+	End If
+End If
+
+Return True
+end function
 
 on w_main.create
 this.p_2=create p_2
