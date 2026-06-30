@@ -19,3 +19,6 @@ facturas_*.csv
 # Bytecode de Python (se regenera; no ensucia el runtime embebido)
 **/__pycache__/
 **/*.pyc
+
+# Regenerable (no versionar)
+*.pra
